@@ -74,7 +74,7 @@ func (a *DigestAuth) Purge(count int) {
  http.Handler for DigestAuth which initiates the authentication process
  (or requires reauthentication).
 */
-func (a *DigestAuth) RequireAuth(w http.ResponseWriter, r *http.Request) {
+func (a *DigestAuth) RequireAuth(w http.ResponseWriter, r *http.Request, writeBody bool) {
 	if len(a.clients) > a.ClientCacheSize+a.ClientCacheTolerance {
 		a.Purge(a.ClientCacheTolerance * 2)
 	}
@@ -83,8 +83,10 @@ func (a *DigestAuth) RequireAuth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("WWW-Authenticate",
 		fmt.Sprintf(`Digest realm="%s", nonce="%s", opaque="%s", algorithm="MD5", qop="auth"`,
 			a.Realm, nonce, a.Opaque))
-	w.WriteHeader(401)
-	w.Write([]byte("401 Unauthorized\n"))
+	if writeBody {
+		w.WriteHeader(401)
+		w.Write([]byte("401 Unauthorized\n"))
+	}
 }
 
 /*
@@ -191,7 +193,7 @@ const DefaultClientCacheTolerance = 100
 func (a *DigestAuth) Wrap(wrapped AuthenticatedHandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if username, authinfo := a.CheckAuth(r); username == "" {
-			a.RequireAuth(w, r)
+			a.RequireAuth(w, r, true)
 		} else {
 			ar := &AuthenticatedRequest{Request: *r, Username: username}
 			if authinfo != nil {
